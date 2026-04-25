@@ -1,0 +1,160 @@
+name: Build And Release
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_NAME: pingtool
+  GO_VERSION: "1.25.0"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run Tests
+        run: go test ./...
+
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    needs: test
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+            archive: zip
+          - goos: windows
+            goarch: arm64
+            ext: .exe
+            archive: zip
+          - goos: linux
+            goarch: amd64
+            ext: ""
+            archive: tar.gz
+          - goos: linux
+            goarch: arm64
+            ext: ""
+            archive: tar.gz
+          - goos: darwin
+            goarch: amd64
+            ext: ""
+            archive: tar.gz
+          - goos: darwin
+            goarch: arm64
+            ext: ""
+            archive: tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Resolve Package Metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="sha-${GITHUB_SHA::7}"
+          fi
+
+          archive_base="${APP_NAME}-${version}-${{ matrix.goos }}-${{ matrix.goarch }}"
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "archive_base=${archive_base}" >> "$GITHUB_OUTPUT"
+
+      - name: Build And Package
+        id: package
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+          EXT: ${{ matrix.ext }}
+          ARCHIVE_KIND: ${{ matrix.archive }}
+          ARCHIVE_BASE: ${{ steps.meta.outputs.archive_base }}
+        run: |
+          set -euo pipefail
+
+          rm -rf dist package
+          mkdir -p "dist" "package/${ARCHIVE_BASE}/docs"
+
+          go build -trimpath -ldflags="-s -w" -o "package/${ARCHIVE_BASE}/${APP_NAME}${EXT}" .
+
+          cp README.md "package/${ARCHIVE_BASE}/"
+          cp docs/API.md docs/API_USAGE.md docs/CROSS_COMPILE.md "package/${ARCHIVE_BASE}/docs/"
+
+          if [[ "${ARCHIVE_KIND}" == "zip" ]]; then
+            (
+              cd package
+              zip -r "../dist/${ARCHIVE_BASE}.zip" "${ARCHIVE_BASE}" > /dev/null
+            )
+            echo "asset=dist/${ARCHIVE_BASE}.zip" >> "$GITHUB_OUTPUT"
+          else
+            tar -C package -czf "dist/${ARCHIVE_BASE}.tar.gz" "${ARCHIVE_BASE}"
+            echo "asset=dist/${ARCHIVE_BASE}.tar.gz" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.archive_base }}
+          path: ${{ steps.package.outputs.asset }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Create GitHub Release
+    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download All Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pingtool-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true

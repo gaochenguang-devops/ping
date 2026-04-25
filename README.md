@@ -333,6 +333,7 @@ TCP 端口探测基于 Go 标准库 `net.Dialer`，天然跨平台。
 交叉编译请看：
 
 - [docs/CROSS_COMPILE.md](docs/CROSS_COMPILE.md)
+- [docs/GITHUB_ACTIONS.md](docs/GITHUB_ACTIONS.md)
 
 ## 项目结构
 
