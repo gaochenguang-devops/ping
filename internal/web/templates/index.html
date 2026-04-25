@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络检测台</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #edf2f7;
+            --surface: #ffffff;
+            --surface-alt: #f7f9fc;
+            --line: #d7deea;
+            --text: #142033;
+            --muted: #66748d;
+            --primary: #2563eb;
+            --primary-strong: #1d4ed8;
+            --success: #0f766e;
+            --warning: #b45309;
+            --danger: #b42318;
+            --shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.08) 0, transparent 28%),
+                radial-gradient(circle at top right, rgba(14, 165, 233, 0.08) 0, transparent 24%),
+                var(--bg);
+            color: var(--text);
+        }
+
+        .shell {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 28px 20px 40px;
+        }
+
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .title h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .title p {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            color: var(--muted);
+            white-space: nowrap;
+            box-shadow: var(--shadow);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #94a3b8;
+        }
+
+        .status-chip[data-state="running"] .status-dot { background: #f59e0b; }
+        .status-chip[data-state="done"] .status-dot { background: #10b981; }
+        .status-chip[data-state="error"] .status-dot { background: #ef4444; }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+            gap: 20px;
+            align-items: start;
+        }
+
+        .surface {
+            background: var(--surface);
+            border: 1px solid rgba(215, 222, 234, 0.9);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .controls,
+        .results {
+            padding: 20px;
+            display: grid;
+            gap: 18px;
+        }
+
+        .section-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .field-group {
+            display: grid;
+            gap: 14px;
+        }
+
+        .field {
+            display: grid;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        input, textarea, select, button {
+            font: inherit;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        select {
+            width: 100%;
+            min-width: 0;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px 14px;
+            background: #fff;
+            color: var(--text);
+            outline: none;
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+
+        textarea {
+            min-height: 152px;
+            resize: vertical;
+        }
+
+        .textarea-compact {
+            min-height: 108px;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+        }
+
+        input:disabled,
+        textarea:disabled,
+        select:disabled {
+            background: #f3f6fb;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .checkbox {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn {
+            height: 44px;
+            padding: 0 16px;
+            border-radius: 8px;
+            border: 0;
+            cursor: pointer;
+            transition: background-color .15s ease, opacity .15s ease;
+        }
+
+        .btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover:enabled {
+            background: var(--primary-strong);
+        }
+
+        .btn-secondary {
+            background: var(--surface-alt);
+            border: 1px solid var(--line);
+            color: var(--text);
+        }
+
+        .hint {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .progress-panel {
+            padding: 16px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--surface-alt);
+            display: grid;
+            gap: 12px;
+        }
+
+        .progress-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .progress-title {
+            display: grid;
+            gap: 4px;
+        }
+
+        .progress-caption {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .progress-percent {
+            font-size: 24px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .progress-track {
+            height: 12px;
+            border-radius: 999px;
+            background: #e4ebf5;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
+            transition: width .25s ease;
+        }
+
+        .progress-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            color: var(--muted);
+            font-size: 13px;
+            flex-wrap: wrap;
+        }
+
+        .progress-mini {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .progress-mini-item {
+            padding: 12px;
+            border-radius: 8px;
+            background: #fff;
+            border: 1px solid var(--line);
+        }
+
+        .progress-mini-item .label {
+            display: block;
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .progress-mini-item .value {
+            display: block;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .summary-card {
+            padding: 14px;
+            border-radius: 8px;
+            background: var(--surface-alt);
+            border: 1px solid var(--line);
+        }
+
+        .summary-card .label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .summary-card .value {
+            display: block;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .meta-row,
+        .filter-row {
+            display: grid;
+            gap: 12px;
+        }
+
+        .meta-row {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .filter-row {
+            grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(140px, 0.8fr)) auto;
+            align-items: end;
+        }
+
+        .meta-box {
+            padding: 12px 14px;
+            border-radius: 8px;
+            background: var(--surface-alt);
+            border: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .table-wrap {
+            overflow: auto;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 1180px;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #f3f6fb;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 600;
+            text-align: left;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        tbody td {
+            padding: 12px 14px;
+            border-bottom: 1px solid #edf1f5;
+            vertical-align: top;
+            font-size: 14px;
+        }
+
+        tbody tr:hover {
+            background: #fafcff;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge.reachable {
+            background: rgba(15, 118, 110, 0.12);
+            color: var(--success);
+        }
+
+        .badge.unreachable {
+            background: rgba(180, 83, 9, 0.12);
+            color: var(--warning);
+        }
+
+        .badge.error {
+            background: rgba(180, 35, 24, 0.12);
+            color: var(--danger);
+        }
+
+        .badge.kind-ping {
+            background: rgba(37, 99, 235, 0.12);
+            color: var(--primary);
+        }
+
+        .badge.kind-tcp {
+            background: rgba(79, 70, 229, 0.12);
+            color: #4338ca;
+        }
+
+        .target-main {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .target-sub {
+            color: var(--muted);
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+            word-break: break-all;
+        }
+
+        .empty {
+            padding: 48px 16px;
+            text-align: center;
+            color: var(--muted);
+            background: var(--surface-alt);
+            border: 1px dashed var(--line);
+            border-radius: 8px;
+        }
+
+        @media (max-width: 1180px) {
+            .layout,
+            .summary-grid,
+            .meta-row,
+            .filter-row,
+            .progress-mini {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 860px) {
+            .topbar,
+            .grid-3 {
+                grid-template-columns: 1fr;
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <div class="topbar">
+            <div class="title">
+                <h1>网络检测台</h1>
+                <p>支持 Windows、Linux、macOS 下的多目标并发检测、网段扫描、TCP 端口探测、结果筛选和 CSV 导出。</p>
+            </div>
+            <div class="status-chip" id="statusChip" data-state="idle">
+                <span class="status-dot"></span>
+                <span id="statusText">就绪</span>
+            </div>
+        </div>
+
+        <div class="layout">
+            <section class="surface controls">
+                <h2 class="section-title">检测配置</h2>
+
+                <div class="field-group">
+                    <div class="field">
+                        <label for="targets">多目标输入</label>
+                        <textarea id="targets" placeholder="支持换行、空格、逗号分隔&#10;例如：&#10;baidu.com&#10;192.168.1.1-10&#10;2001:db8::1-2001:db8::10"></textarea>
+                        <p class="hint">可输入域名、IPv4、IPv6，以及 IPv4/IPv6 范围。重复目标会自动去重。</p>
+                    </div>
+
+                    <div class="field">
+                        <label for="cidr">网段输入</label>
+                        <textarea id="cidr" class="textarea-compact" placeholder="支持换行、空格、逗号分隔&#10;例如：&#10;192.168.1.0/24&#10;2001:db8::/126"></textarea>
+                        <p class="hint">支持 IPv4/IPv6 CIDR。多个网段同样可用换行、空格、逗号分隔。单次最多 4096 个目标。</p>
+                    </div>
+
+                    <div class="field">
+                        <label for="mode">检测模式</label>
+                        <select id="mode" onchange="handleModeChange()">
+                            <option value="ping">Ping</option>
+                            <option value="tcp">TCP 端口</option>
+                            <option value="both">Ping + TCP</option>
+                        </select>
+                        <p class="hint" id="modeHint">默认只做 Ping。TCP 模式会按“目标 x 端口”展开检测任务。</p>
+                    </div>
+
+                    <div class="field">
+                        <label for="ports">端口输入</label>
+                        <textarea id="ports" class="textarea-compact" placeholder="支持换行、空格、逗号分隔&#10;例如：&#10;80&#10;443,8080-8082" disabled></textarea>
+                        <p class="hint" id="portsHint">仅在 TCP 端口或 Ping + TCP 模式下使用。支持单端口和范围，最多 256 个端口。</p>
+                    </div>
+                </div>
+
+                <div class="grid-3">
+                    <div class="field">
+                        <label for="count">Ping 次数</label>
+                        <input id="count" type="number" min="1" max="4" value="1">
+                    </div>
+                    <div class="field">
+                        <label for="timeout">超时(ms)</label>
+                        <input id="timeout" type="number" min="200" max="5000" step="100" value="1000">
+                    </div>
+                    <div class="field">
+                        <label for="concurrency">并发数</label>
+                        <input id="concurrency" type="number" min="1" max="256" value="32">
+                    </div>
+                </div>
+
+                <label class="checkbox" for="resolveDNS">
+                    <input id="resolveDNS" type="checkbox" checked>
+                    检测前先做 DNS 解析
+                </label>
+
+                <div class="toolbar">
+                    <button id="runBtn" class="btn btn-primary" onclick="startScan()">开始检测</button>
+                    <button id="cancelBtn" class="btn btn-secondary" onclick="cancelScan()" disabled>取消检测</button>
+                    <button id="exportBtn" class="btn btn-secondary" onclick="exportCSV()" disabled>导出 CSV</button>
+                </div>
+            </section>
+
+            <section class="surface results">
+                <div>
+                    <h2 class="section-title">检测进度</h2>
+                </div>
+
+                <div class="progress-panel">
+                    <div class="progress-head">
+                        <div class="progress-title">
+                            <strong id="progressMessage">等待开始</strong>
+                            <span class="progress-caption" id="progressTime">开始时间：-　结束时间：-</span>
+                        </div>
+                        <span class="progress-percent" id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress-track">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div class="progress-meta">
+                        <span id="progressCountText">已完成 0 / 0</span>
+                        <span id="progressStateText">状态：空闲</span>
+                    </div>
+                    <div class="progress-mini">
+                        <div class="progress-mini-item"><span class="label">总目标数</span><span class="value" id="progTotal">0</span></div>
+                        <div class="progress-mini-item"><span class="label">可达</span><span class="value" id="progReachable">0</span></div>
+                        <div class="progress-mini-item"><span class="label">不可达</span><span class="value" id="progUnreachable">0</span></div>
+                        <div class="progress-mini-item"><span class="label">错误</span><span class="value" id="progErrors">0</span></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="section-title">结果汇总</h2>
+                </div>
+
+                <div class="summary-grid">
+                    <div class="summary-card"><span class="label">总目标数</span><span class="value" id="sumTotal">-</span></div>
+                    <div class="summary-card"><span class="label">可达</span><span class="value" id="sumReachable">-</span></div>
+                    <div class="summary-card"><span class="label">不可达</span><span class="value" id="sumUnreachable">-</span></div>
+                    <div class="summary-card"><span class="label">错误</span><span class="value" id="sumErrors">-</span></div>
+                    <div class="summary-card"><span class="label">平均时延</span><span class="value" id="sumLatency">-</span></div>
+                    <div class="summary-card"><span class="label">总耗时</span><span class="value" id="sumElapsed">-</span></div>
+                </div>
+
+                <div class="meta-row">
+                    <div class="meta-box" id="scanTime">开始时间：-<br>结束时间：-</div>
+                    <div class="meta-box" id="filterStats">当前未加载结果</div>
+                    <div class="meta-box">导出 CSV 会基于当前筛选结果。</div>
+                </div>
+
+                <div class="filter-row">
+                    <div class="field">
+                        <label for="keyword">关键词筛选</label>
+                        <input id="keyword" type="text" placeholder="目标、端口、端点、IP、结果说明" oninput="renderResults()">
+                    </div>
+                    <div class="field">
+                        <label for="statusFilter">状态</label>
+                        <select id="statusFilter" onchange="renderResults()">
+                            <option value="all">全部状态</option>
+                            <option value="reachable">仅可达</option>
+                            <option value="unreachable">仅不可达</option>
+                            <option value="error">仅错误</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="sourceFilter">来源</label>
+                        <select id="sourceFilter" onchange="renderResults()">
+                            <option value="all">全部来源</option>
+                            <option value="manual">手动输入</option>
+                            <option value="cidr">网段扩展</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="kindFilter">类型</label>
+                        <select id="kindFilter" onchange="renderResults()">
+                            <option value="all">全部类型</option>
+                            <option value="ping">仅 Ping</option>
+                            <option value="tcp">仅 TCP</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" onclick="resetFilters()">重置筛选</button>
+                </div>
+
+                <div id="emptyState" class="empty">还没有检测结果。</div>
+                <div id="tableWrap" class="table-wrap" hidden>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>目标</th>
+                                <th>类型</th>
+                                <th>端口/端点</th>
+                                <th>来源</th>
+                                <th>状态</th>
+                                <th>解析地址</th>
+                                <th>收发</th>
+                                <th>丢包率</th>
+                                <th>平均时延</th>
+                                <th>耗时</th>
+                                <th>说明</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            results: [],
+            summary: null,
+            currentJobId: "",
+            pollTimer: 0
+        };
+
+        const statusLabels = {
+            reachable: "可达",
+            unreachable: "不可达",
+            error: "错误"
+        };
+
+        const sourceLabels = {
+            manual: "手动输入",
+            cidr: "网段扩展"
+        };
+
+        const kindLabels = {
+            ping: "Ping",
+            tcp: "TCP"
+        };
+
+        const progressLabels = {
+            queued: "等待中",
+            running: "检测中",
+            done: "已完成",
+            error: "错误",
+            canceled: "已取消"
+        };
+
+        function $(id) {
+            return document.getElementById(id);
+        }
+
+        function setStatus(stateName, text) {
+            $("statusChip").dataset.state = stateName;
+            $("statusText").textContent = text;
+        }
+
+        function setBusy(running) {
+            $("runBtn").disabled = running;
+            $("cancelBtn").disabled = !running;
+        }
+
+        function stopPolling() {
+            if (state.pollTimer) {
+                window.clearTimeout(state.pollTimer);
+                state.pollTimer = 0;
+            }
+        }
+
+        function handleModeChange() {
+            const mode = $("mode").value;
+            const usesPorts = mode !== "ping";
+
+            $("ports").disabled = !usesPorts;
+            $("count").disabled = mode === "tcp";
+
+            if (mode === "ping") {
+                $("modeHint").textContent = "仅执行 Ping 探测。端口输入会被禁用。";
+                $("portsHint").textContent = "Ping 模式不使用端口输入。切换到 TCP 模式后会保留这里的内容。";
+                return;
+            }
+
+            if (mode === "tcp") {
+                $("modeHint").textContent = "仅执行 TCP 端口探测。会按“目标 x 端口”展开检测任务。";
+                $("portsHint").textContent = "支持单端口和范围，例如 80,443,8080-8082。最多 256 个端口。";
+                return;
+            }
+
+            $("modeHint").textContent = "先对每个目标做 Ping，再对每个目标的指定端口做 TCP 探测。";
+            $("portsHint").textContent = "支持单端口和范围，例如 80,443,8080-8082。最多 256 个端口。";
+        }
+
+        function getPayload() {
+            const mode = $("mode").value;
+            return {
+                targets: $("targets").value.trim(),
+                cidr: $("cidr").value.trim(),
+                ports: mode === "ping" ? "" : $("ports").value.trim(),
+                mode,
+                count: Number($("count").value),
+                timeout_ms: Number($("timeout").value),
+                concurrency: Number($("concurrency").value),
+                resolve_dns: $("resolveDNS").checked
+            };
+        }
+
+        function resetResults() {
+            state.results = [];
+            state.summary = null;
+            $("exportBtn").disabled = true;
+            renderSummary();
+            renderResults();
+        }
+
+        function renderProgress(progress) {
+            const data = progress || {
+                total: 0,
+                completed: 0,
+                reachable: 0,
+                unreachable: 0,
+                errors: 0,
+                percent: 0,
+                status: "idle",
+                started_at: "",
+                finished_at: "",
+                message: "等待开始"
+            };
+
+            const percent = Math.max(0, Math.min(100, Number(data.percent || 0)));
+            $("progressFill").style.width = percent + "%";
+            $("progressPercent").textContent = percent.toFixed(0) + "%";
+            $("progressMessage").textContent = data.message || progressLabels[data.status] || "等待开始";
+            $("progressTime").textContent = `开始时间：${data.started_at || "-"}　结束时间：${data.finished_at || "-"}`;
+            $("progressCountText").textContent = `已完成 ${data.completed || 0} / ${data.total || 0}`;
+            $("progressStateText").textContent = `状态：${progressLabels[data.status] || "空闲"}`;
+            $("progTotal").textContent = data.total || 0;
+            $("progReachable").textContent = data.reachable || 0;
+            $("progUnreachable").textContent = data.unreachable || 0;
+            $("progErrors").textContent = data.errors || 0;
+        }
+
+        async function startScan() {
+            const payload = getPayload();
+            if (!payload.targets && !payload.cidr) {
+                alert("请至少输入一个目标地址或网段。");
+                return;
+            }
+            if (payload.mode === "ping" && payload.ports) {
+                alert("当前为 Ping 模式。若需要端口探测，请切换到 TCP 端口或 Ping + TCP。");
+                return;
+            }
+            if (payload.mode !== "ping" && !payload.ports) {
+                alert("TCP 端口探测需要输入要检测的端口。");
+                return;
+            }
+            if (!Number.isFinite(payload.count) || payload.count < 1 || payload.count > 4) {
+                alert("Ping 次数必须在 1 到 4 之间。");
+                return;
+            }
+            if (!Number.isFinite(payload.timeout_ms) || payload.timeout_ms < 200 || payload.timeout_ms > 5000) {
+                alert("超时时间必须在 200 到 5000 毫秒之间。");
+                return;
+            }
+            if (!Number.isFinite(payload.concurrency) || payload.concurrency < 1 || payload.concurrency > 256) {
+                alert("并发数必须在 1 到 256 之间。");
+                return;
+            }
+
+            stopPolling();
+            resetResults();
+            state.currentJobId = "";
+            renderProgress({
+                total: 0,
+                completed: 0,
+                reachable: 0,
+                unreachable: 0,
+                errors: 0,
+                percent: 0,
+                status: "queued",
+                started_at: "",
+                finished_at: "",
+                message: "正在创建任务"
+            });
+
+            setBusy(true);
+            setStatus("running", "检测中");
+
+            try {
+                const response = await fetch("/api/scan-jobs", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const job = await response.json();
+                if (!response.ok) {
+                    throw new Error(job.error || "检测失败");
+                }
+
+                state.currentJobId = job.id;
+                applyJobSnapshot(job);
+
+                if (!isTerminalStatus(job.progress && job.progress.status)) {
+                    pollJob(job.id);
+                }
+            } catch (error) {
+                setBusy(false);
+                setStatus("error", error.message || "检测失败");
+                renderProgress({
+                    total: 0,
+                    completed: 0,
+                    reachable: 0,
+                    unreachable: 0,
+                    errors: 0,
+                    percent: 0,
+                    status: "error",
+                    started_at: "",
+                    finished_at: "",
+                    message: error.message || "检测失败"
+                });
+            }
+        }
+
+        function pollJob(jobId) {
+            stopPolling();
+
+            const tick = async () => {
+                if (state.currentJobId !== jobId) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/scan-jobs/${encodeURIComponent(jobId)}`);
+                    const job = await response.json();
+                    if (!response.ok) {
+                        throw new Error(job.error || "获取进度失败");
+                    }
+
+                    applyJobSnapshot(job);
+
+                    if (state.currentJobId === jobId && !isTerminalStatus(job.progress && job.progress.status)) {
+                        state.pollTimer = window.setTimeout(tick, 350);
+                    }
+                } catch (error) {
+                    setBusy(false);
+                    setStatus("error", error.message || "获取进度失败");
+                    state.currentJobId = "";
+                    stopPolling();
+                }
+            };
+
+            state.pollTimer = window.setTimeout(tick, 250);
+        }
+
+        async function cancelScan() {
+            if (!state.currentJobId) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/scan-jobs/${encodeURIComponent(state.currentJobId)}/cancel`, {
+                    method: "POST"
+                });
+                const job = await response.json();
+                if (!response.ok) {
+                    throw new Error(job.error || "取消失败");
+                }
+                applyJobSnapshot(job);
+            } catch (error) {
+                setStatus("error", error.message || "取消失败");
+            }
+        }
+
+        function applyJobSnapshot(job) {
+            const progress = job.progress || null;
+            renderProgress(progress);
+
+            if (!progress) {
+                return;
+            }
+
+            if (progress.status === "done") {
+                state.results = Array.isArray(job.result && job.result.results) ? job.result.results : [];
+                state.summary = job.result && job.result.summary ? job.result.summary : null;
+                renderSummary();
+                renderResults();
+                $("exportBtn").disabled = state.results.length === 0;
+                setBusy(false);
+                setStatus("done", `完成，返回 ${state.results.length} 条结果`);
+                state.currentJobId = "";
+                stopPolling();
+                return;
+            }
+
+            if (progress.status === "error") {
+                setBusy(false);
+                setStatus("error", job.error || progress.message || "检测失败");
+                state.currentJobId = "";
+                stopPolling();
+                return;
+            }
+
+            if (progress.status === "canceled") {
+                setBusy(false);
+                setStatus("idle", "已取消");
+                state.currentJobId = "";
+                stopPolling();
+                return;
+            }
+
+            const total = progress.total || 0;
+            const completed = progress.completed || 0;
+            setStatus("running", total ? `检测中 ${completed}/${total}` : "检测中");
+        }
+
+        function renderSummary() {
+            const summary = state.summary;
+            if (!summary) {
+                $("sumTotal").textContent = "-";
+                $("sumReachable").textContent = "-";
+                $("sumUnreachable").textContent = "-";
+                $("sumErrors").textContent = "-";
+                $("sumLatency").textContent = "-";
+                $("sumElapsed").textContent = "-";
+                $("scanTime").innerHTML = "开始时间：-<br>结束时间：-";
+                return;
+            }
+
+            $("sumTotal").textContent = summary.total ?? "-";
+            $("sumReachable").textContent = summary.reachable ?? "-";
+            $("sumUnreachable").textContent = summary.unreachable ?? "-";
+            $("sumErrors").textContent = summary.errors ?? "-";
+            $("sumLatency").textContent = formatLatency(summary.avg_latency_ms);
+            $("sumElapsed").textContent = `${summary.elapsed_ms ?? 0} ms`;
+            $("scanTime").innerHTML = `开始时间：${escapeHtml(summary.started_at || "-")}<br>结束时间：${escapeHtml(summary.finished_at || "-")}`;
+        }
+
+        function getFilteredResults() {
+            const keyword = $("keyword").value.trim().toLowerCase();
+            const statusFilter = $("statusFilter").value;
+            const sourceFilter = $("sourceFilter").value;
+            const kindFilter = $("kindFilter").value;
+
+            return state.results.filter(item => {
+                if (statusFilter !== "all" && item.status !== statusFilter) {
+                    return false;
+                }
+                if (sourceFilter !== "all" && !String(item.source || "").includes(sourceFilter)) {
+                    return false;
+                }
+                if (kindFilter !== "all" && item.kind !== kindFilter) {
+                    return false;
+                }
+                if (!keyword) {
+                    return true;
+                }
+
+                const haystack = [
+                    item.target,
+                    item.kind,
+                    item.endpoint,
+                    item.port,
+                    item.source,
+                    item.message,
+                    Array.isArray(item.resolved_ips) ? item.resolved_ips.join(" ") : ""
+                ].join(" ").toLowerCase();
+
+                return haystack.includes(keyword);
+            });
+        }
+
+        function renderResults() {
+            const filtered = getFilteredResults();
+            const body = $("resultBody");
+
+            $("filterStats").textContent = state.results.length
+                ? `当前显示 ${filtered.length} / ${state.results.length} 条结果`
+                : "当前未加载结果";
+
+            if (!filtered.length) {
+                $("emptyState").hidden = false;
+                $("tableWrap").hidden = true;
+                $("emptyState").textContent = state.results.length ? "筛选后没有结果。" : "还没有检测结果。";
+                body.innerHTML = "";
+                return;
+            }
+
+            $("emptyState").hidden = true;
+            $("tableWrap").hidden = false;
+
+            body.innerHTML = filtered.map(item => {
+                const resolved = Array.isArray(item.resolved_ips) && item.resolved_ips.length
+                    ? escapeHtml(item.resolved_ips.join(", "))
+                    : "-";
+
+                return `
+                    <tr>
+                        <td>
+                            <span class="target-main">${escapeHtml(item.target || "-")}</span>
+                            <span class="target-sub">${escapeHtml(item.message || "-")}</span>
+                        </td>
+                        <td><span class="badge ${item.kind === "tcp" ? "kind-tcp" : "kind-ping"}">${escapeHtml(formatKind(item.kind))}</span></td>
+                        <td class="mono">${escapeHtml(formatEndpoint(item))}</td>
+                        <td>${escapeHtml(formatSource(item.source))}</td>
+                        <td><span class="badge ${escapeHtml(item.status || "error")}">${escapeHtml(statusLabels[item.status] || item.status || "-")}</span></td>
+                        <td>${resolved}</td>
+                        <td>${escapeHtml(formatSentReceived(item))}</td>
+                        <td>${escapeHtml(formatLoss(item))}</td>
+                        <td>${escapeHtml(formatLatency(item.avg_latency_ms))}</td>
+                        <td>${escapeHtml(formatDuration(item.duration_ms))}</td>
+                        <td>${escapeHtml(item.message || "-")}</td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        function resetFilters() {
+            $("keyword").value = "";
+            $("statusFilter").value = "all";
+            $("sourceFilter").value = "all";
+            $("kindFilter").value = "all";
+            renderResults();
+        }
+
+        function exportCSV() {
+            const filtered = getFilteredResults();
+            if (!filtered.length) {
+                alert("当前没有可导出的结果。");
+                return;
+            }
+
+            const header = ["目标", "类型", "端口/端点", "来源", "状态", "解析地址", "已收", "已发", "丢包率", "最小时延(ms)", "平均时延(ms)", "最大时延(ms)", "耗时(ms)", "说明"];
+            const rows = filtered.map(item => ([
+                item.target || "",
+                formatKind(item.kind),
+                formatEndpoint(item),
+                formatSource(item.source),
+                statusLabels[item.status] || item.status || "",
+                Array.isArray(item.resolved_ips) ? item.resolved_ips.join(" | ") : "",
+                exportReceived(item),
+                exportSent(item),
+                formatLoss(item),
+                numericText(item.min_latency_ms),
+                numericText(item.avg_latency_ms),
+                numericText(item.max_latency_ms),
+                item.duration_ms ?? "",
+                item.message || ""
+            ]));
+
+            const csv = [header, ...rows].map(columns => columns.map(escapeCSV).join(",")).join("\r\n");
+            const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `network-scan-results-${Date.now()}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function isTerminalStatus(status) {
+            return status === "done" || status === "error" || status === "canceled";
+        }
+
+        function formatLatency(value) {
+            if (value === null || value === undefined || value === "") {
+                return "-";
+            }
+            return `${Number(value).toFixed(2)} ms`;
+        }
+
+        function formatDuration(value) {
+            if (value === null || value === undefined) {
+                return "-";
+            }
+            return `${value} ms`;
+        }
+
+        function formatPercent(value) {
+            if (value === null || value === undefined || Number.isNaN(Number(value))) {
+                return "-";
+            }
+            return `${Number(value).toFixed(0)}%`;
+        }
+
+        function formatKind(kind) {
+            return kindLabels[kind] || kind || "-";
+        }
+
+        function formatEndpoint(item) {
+            if (item.kind === "ping") {
+                return "ICMP";
+            }
+
+            const port = item.port ?? "";
+            const endpoint = item.endpoint || "";
+            if (port && endpoint) {
+                return `${port} / ${endpoint}`;
+            }
+            return endpoint || String(port || "-");
+        }
+
+        function formatSentReceived(item) {
+            if (item.kind !== "ping" || !item.sent) {
+                return "-";
+            }
+            return `${item.received}/${item.sent}`;
+        }
+
+        function exportReceived(item) {
+            if (item.kind !== "ping") {
+                return "";
+            }
+            return item.received ?? "";
+        }
+
+        function exportSent(item) {
+            if (item.kind !== "ping") {
+                return "";
+            }
+            return item.sent ?? "";
+        }
+
+        function formatLoss(item) {
+            if (item.kind !== "ping") {
+                return "-";
+            }
+            return formatPercent(item.loss_percent);
+        }
+
+        function numericText(value) {
+            if (value === null || value === undefined || value === "") {
+                return "";
+            }
+            return Number(value).toFixed(2);
+        }
+
+        function formatSource(source) {
+            if (!source) {
+                return "-";
+            }
+            return String(source)
+                .split(",")
+                .map(part => sourceLabels[part] || part)
+                .join(" + ");
+        }
+
+        function escapeCSV(value) {
+            const text = String(value ?? "");
+            if (text.includes(",") || text.includes("\"") || text.includes("\n")) {
+                return `"${text.replace(/"/g, "\"\"")}"`;
+            }
+            return text;
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, char => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "\"": "&quot;",
+                "'": "&#39;"
+            })[char]);
+        }
+
+        handleModeChange();
+        renderProgress();
+        renderSummary();
+        renderResults();
+    </script>
+</body>
+</html>
