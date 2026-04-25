@@ -53,9 +53,26 @@ git push origin v1.0.0
 其中：
 
 - `push`：自动测试、构建、上传 Artifacts
+- `push` 到 `v*` 标签：额外创建 Release
 - `pull_request`：自动测试、构建、上传 Artifacts
 - `workflow_dispatch`：手动触发
-- `refs/tags/v*`：自动发布 Release
+
+当前 `push` 触发已显式区分：
+
+- 所有分支：都会构建并上传 Artifacts
+- `v*` 标签：会额外创建 GitHub Release
+
+为了方便排查，Actions 页面中的 Run 名称现在会显示：
+
+```text
+<event_name> / <ref_type> / <ref_name>
+```
+
+例如：
+
+- `push / branch / main`
+- `push / tag / v1.0.0`
+- `pull_request / branch / main`
 
 ## 产物格式
 
@@ -264,6 +281,22 @@ cp docs/API.md docs/API_USAGE.md docs/CROSS_COMPILE.md "package/${ARCHIVE_BASE}/
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+如果你在 Actions 页面里看到的是：
+
+```text
+push / branch / main
+```
+
+那它不会发 Release。
+
+只有看到类似：
+
+```text
+push / tag / v1.0.0
+```
+
+才会进入 Release Job。
 
 ### 2. 为什么有 Artifacts 但没有 Release
 
